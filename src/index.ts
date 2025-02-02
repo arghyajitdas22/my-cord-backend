@@ -1,6 +1,8 @@
 import express from "express";
 import dotenv from "dotenv";
 
+import connectDb from "./db/connect";
+
 dotenv.config(); //for loading environment variables
 
 const app = express(); //creating express app
@@ -14,6 +16,16 @@ app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
-});
+//connecting to database
+const run = async () => {
+  try {
+    await connectDb(process.env.MONGO_URI as string);
+    app.listen(port, () => {
+      console.log(`Server is running at http://localhost:${port}`);
+    });
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+run(); //running the server
