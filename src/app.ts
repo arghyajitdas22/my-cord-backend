@@ -23,4 +23,10 @@ app.use(
 );
 app.use(express.static("public"));
 
+//import routes
+import healthcheckRoute from "./routes/healthcheck.route";
+
+//use routes
+app.use("/api/v1/healthcheck", healthcheckRoute);
+
 export { app };
