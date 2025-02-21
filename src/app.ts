@@ -1,6 +1,7 @@
-import express from "express";
+import express, { NextFunction, Request, Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
+import { errorHandler } from "./middlewares/error.middleware";
 
 const app = express();
 
@@ -30,5 +31,7 @@ import healthcheckRoute from "./routes/healthcheck.route";
 
 //use routes
 app.use("/api/v1/healthcheck", healthcheckRoute);
+
+app.use(errorHandler);
 
 export { app };
