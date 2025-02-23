@@ -1,8 +1,8 @@
-export interface IUser {
+export type IUser = {
   username: string;
-  email: string;
   password: string;
-  displayName: string;
+  email: string;
   dateOfBirth: Date;
-  refreshToken: string;
-}
+  displayName: string;
+  refreshToken?: string | undefined;
+};

@@ -1,5 +1,5 @@
 import { Schema, model } from "mongoose";
-import { IUser } from "../types/User";
+import type { IUser } from "../types/User";
 import bcyrpt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import type { StringValue } from "ms";

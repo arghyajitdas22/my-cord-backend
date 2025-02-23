@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response, NextFunction } from "express-serve-static-core";
 import { ApiError } from "../utils/ApiError";
 import { StatusCodes } from "http-status-codes";
 import mongoose from "mongoose";
