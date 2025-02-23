@@ -78,4 +78,28 @@ const registerUserSchema = z.object({
     }),
 });
 
-export { registerUserSchema };
+const loginUserSchema = z.object({
+  email: z
+    .string({ required_error: "Please provide an email" })
+    .email()
+    .toLowerCase()
+    .trim()
+    .regex(
+      /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/,
+      {
+        message: "Please provide a valid email address",
+      }
+    ),
+  password: z
+    .string({ required_error: "Please provide a password" })
+    .min(6)
+    .regex(
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/,
+      {
+        message:
+          "Password must contain at least 6 characters, including one uppercase letter, one lowercase letter, one number and one special character",
+      }
+    ),
+});
+
+export { registerUserSchema, loginUserSchema };
