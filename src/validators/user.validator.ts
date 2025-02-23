@@ -15,7 +15,36 @@ enum Month {
   December = "December",
 }
 
+const monthMap: Record<string, number> = {
+  january: 1,
+  february: 2,
+  march: 3,
+  april: 4,
+  may: 5,
+  june: 6,
+  july: 7,
+  august: 8,
+  september: 9,
+  october: 10,
+  november: 11,
+  december: 12,
+};
+
 const registerUserSchema = z.object({
+  email: z
+    .string({ required_error: "Please provide an email" })
+    .email()
+    .toLowerCase()
+    .trim()
+    .regex(
+      /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/,
+      {
+        message: "Please provide a valid email address",
+      }
+    ),
+  displayName: z
+    .string({ required_error: "Please provide a display name" })
+    .trim(),
   username: z
     .string({ required_error: "Please provide a username" })
     .max(20)
@@ -24,24 +53,29 @@ const registerUserSchema = z.object({
     .string({ required_error: "Please provide a password" })
     .min(6)
     .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{6,}$/,
+      {
+        message:
+          "Password must contain at least 6 characters, including one uppercase letter, one lowercase letter, one number and one special character",
+      }
     ),
-  email: z
-    .string({ required_error: "Please provide an email" })
-    .email()
-    .toLowerCase()
-    .trim()
-    .regex(
-      /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
-    ),
-  displayName: z
-    .string({ required_error: "Please provide a display name" })
-    .trim(),
-  dateOfBirth: z.object({
-    day: z.number(),
-    month: z.nativeEnum(Month),
-    year: z.number(),
-  }),
+  dateOfBirth: z
+    .object({
+      day: z.number().min(1).max(31, "Invalid day"),
+      month: z.union([
+        z.number().min(1).max(12, "Invalid month"),
+        z
+          .string()
+          .toLowerCase()
+          .transform((m) => monthMap[m]),
+      ]),
+      year: z.number().max(new Date().getFullYear(), "Invalid year"),
+    })
+    .transform(({ day, month, year }) => {
+      const dob = new Date(year, month - 1, day);
+      if (isNaN(dob.getTime())) throw new Error("Invalid date combination");
+      return dob;
+    }),
 });
 
 export { registerUserSchema };

@@ -5,4 +5,8 @@ export type IUser = {
   dateOfBirth: Date;
   displayName: string;
   refreshToken?: string | undefined;
+
+  comparePassword(candidatePassword: string): Promise<boolean>;
+  generateAccessToken(): string;
+  generateRefreshToken(): string;
 };

@@ -1,4 +1,4 @@
-import { Schema, model } from "mongoose";
+import { Schema, model, Model } from "mongoose";
 import type { IUser } from "../types/User";
 import bcyrpt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -33,6 +33,7 @@ const userSchema = new Schema<IUser>(
       unique: true,
       lowercase: true,
       trim: true,
+      index: true,
     },
     displayName: {
       type: String,
@@ -68,7 +69,7 @@ userSchema.methods.generateAccessToken = function () {
   return jwt.sign(
     { userId: this._id, email: this.email, username: this.username },
     process.env.ACCESS_TOKEN_SECRET as string,
-    { expiresIn: process.env.ACCESS_TOKEN_LIFE as StringValue }
+    { expiresIn: process.env.ACCESS_TOKEN_EXPIRY as StringValue }
   );
 };
 
@@ -76,8 +77,8 @@ userSchema.methods.generateRefreshToken = function () {
   return jwt.sign(
     { userId: this._id },
     process.env.REFRESH_TOKEN_SECRET as string,
-    { expiresIn: process.env.REFRESH_TOKEN_LIFE as StringValue }
+    { expiresIn: process.env.REFRESH_TOKEN_EXPIRY as StringValue }
   );
 };
 
-export const User = model("User", userSchema);
+export const User: Model<IUser> = model<IUser>("User", userSchema);

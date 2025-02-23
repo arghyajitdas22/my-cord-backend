@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express-serve-static-core";
 import { ApiError } from "../utils/ApiError";
 import { StatusCodes } from "http-status-codes";
 import mongoose from "mongoose";
+import { ZodError } from "zod";
 
 const errorHandler = (
   err: unknown,
@@ -11,7 +12,12 @@ const errorHandler = (
 ): void => {
   let error = err as ApiError;
 
-  if (!(error instanceof ApiError)) {
+  if (error instanceof ZodError) {
+    const statusCode = StatusCodes.BAD_REQUEST;
+    const message = "Validation Error";
+    const errors = error.issues;
+    error = new ApiError(statusCode, message, errors);
+  } else if (!(error instanceof ApiError)) {
     const statusCode =
       (error as any) instanceof mongoose.Error
         ? StatusCodes.BAD_REQUEST
@@ -28,6 +34,7 @@ const errorHandler = (
   const response = {
     message: error.message,
     statusCode: error.statusCode,
+    errors: error.errors || [],
     ...(process.env.NODE_ENV === "development" ? { stack: error.stack } : {}),
   };
 
