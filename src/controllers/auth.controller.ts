@@ -9,6 +9,17 @@ import {
   registerUserSchema,
 } from "../validators/user.validator";
 
+const accessTokenOptions = {
+  httpOnly: true,
+  secure: true,
+};
+
+const refreshTokenOptions = {
+  httpOnly: true,
+  secure: true,
+  path: "/api/refresh-token",
+};
+
 const registerUser = asyncHandler(async (req: Request, res: Response) => {
   const receivedUser = req.body;
   const validatedUser = registerUserSchema.parse(receivedUser);
@@ -26,12 +37,15 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
   const createdUser = await User.findById(user._id).select(
     "-password -refreshToken"
   );
-  return res.status(StatusCodes.OK).json(
-    new ApiResponse(StatusCodes.CREATED, "User has been registered", {
-      user: createdUser,
-      accessToken,
-    })
-  );
+  return res
+    .status(StatusCodes.OK)
+    .cookie("accessToken", accessToken, accessTokenOptions)
+    .cookie("refreshToken", refreshToken, refreshTokenOptions)
+    .json(
+      new ApiResponse(StatusCodes.CREATED, "User has been registered", {
+        user: createdUser,
+      })
+    );
 });
 
 const loginUser = asyncHandler(async (req: Request, res: Response) => {
@@ -52,12 +66,15 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
   const updatedUser = await User.findById(user._id).select(
     "-password -refreshToken"
   );
-  return res.status(StatusCodes.OK).json(
-    new ApiResponse(StatusCodes.OK, "User has been logged in", {
-      user: updatedUser,
-      accessToken,
-    })
-  );
+  return res
+    .status(StatusCodes.OK)
+    .cookie("accessToken", accessToken, accessTokenOptions)
+    .cookie("refreshToken", refreshToken, refreshTokenOptions)
+    .json(
+      new ApiResponse(StatusCodes.OK, "User has been logged in", {
+        user: updatedUser,
+      })
+    );
 });
 
 export { registerUser, loginUser };
