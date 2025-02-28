@@ -1,7 +1,11 @@
-import express, { NextFunction, Request, Response } from "express";
+import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { errorHandler } from "./middlewares/error.middleware";
+import logger from "./utils/logger";
+import morgan from "morgan";
+
+const morganFormat = ":method :url :status :response-time ms";
 
 const app = express();
 
@@ -25,6 +29,21 @@ app.use(
 );
 app.use(express.static("public"));
 app.use(cookieParser());
+app.use(
+  morgan(morganFormat, {
+    stream: {
+      write: (message) => {
+        const logObject = {
+          method: message.split(" ")[0],
+          url: message.split(" ")[1],
+          status: message.split(" ")[2],
+          responseTime: message.split(" ")[3],
+        };
+        logger.info(JSON.stringify(logObject));
+      },
+    },
+  })
+);
 
 //import routes
 import healthcheckRoute from "./routes/healthcheck.route";
