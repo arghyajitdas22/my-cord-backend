@@ -21,7 +21,7 @@ const verifyAccessToken = asyncHandler(
         accessToken,
         process.env.ACCESS_TOKEN_SECRET as string
       );
-      const user = await User.findById((decodedAccessToken as any)._id);
+      const user = await User.findById((decodedAccessToken as any).userId);
       if (!user) {
         throw new ApiError(StatusCodes.UNAUTHORIZED, "Invalid token");
       }
