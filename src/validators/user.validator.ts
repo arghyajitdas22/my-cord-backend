@@ -65,9 +65,21 @@ const registerUserSchema = z.object({
       month: z.union([
         z.number().min(1).max(12, "Invalid month"),
         z
-          .string()
-          .toLowerCase()
-          .transform((m) => monthMap[m]),
+          .enum([
+            "January",
+            "February",
+            "March",
+            "April",
+            "May",
+            "June",
+            "July",
+            "August",
+            "September",
+            "October",
+            "November",
+            "December",
+          ])
+          .transform((m) => monthMap[m.toLowerCase()]),
       ]),
       year: z.number().max(new Date().getFullYear(), "Invalid year"),
     })

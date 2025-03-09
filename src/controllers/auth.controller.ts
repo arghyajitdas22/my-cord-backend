@@ -9,6 +9,7 @@ import {
   registerUserSchema,
 } from "../validators/user.validator";
 import jwt from "jsonwebtoken";
+import { AuthenticatedRequest } from "../types/AuthenticatedRequest";
 
 const accessTokenOptions = {
   httpOnly: true,
@@ -45,6 +46,7 @@ const registerUser = asyncHandler(async (req: Request, res: Response) => {
     .json(
       new ApiResponse(StatusCodes.CREATED, "User has been registered", {
         user: createdUser,
+        accessToken,
       })
     );
 });
@@ -74,47 +76,51 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
     .json(
       new ApiResponse(StatusCodes.OK, "User has been logged in", {
         user: updatedUser,
+        accessToken,
       })
     );
 });
 
-const refreshTokens = asyncHandler(async (req: Request, res: Response) => {
-  const incomingrefreshToken = req.cookies.refreshToken;
-  if (!incomingrefreshToken) {
-    throw new ApiError(StatusCodes.UNAUTHORIZED, "Refresh token is missing");
-  }
+const refreshTokens = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    const incomingrefreshToken = req.cookies.refreshToken;
+    if (!incomingrefreshToken) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "Refresh token is missing");
+    }
 
-  try {
-    const deodedRefreshToken = jwt.verify(
-      incomingrefreshToken,
-      process.env.REFRESH_TOKEN_SECRET as string
-    );
-    const user = await User.findById((deodedRefreshToken as any).userId);
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
-    }
-    if (user.refreshToken !== incomingrefreshToken) {
-      throw new ApiError(StatusCodes.UNAUTHORIZED, "Refresh Token Expired");
-    }
-    const accessToken = user.generateAccessToken();
-    const refreshToken = user.generateRefreshToken();
-    user.refreshToken = refreshToken;
-    await user.save({ validateBeforeSave: false });
-    const loggedInUser = await User.findById(user._id).select(
-      "-password -refreshToken"
-    );
-    return res
-      .status(StatusCodes.OK)
-      .cookie("accessToken", accessToken, accessTokenOptions)
-      .cookie("refreshToken", refreshToken, refreshTokenOptions)
-      .json(
-        new ApiResponse(StatusCodes.OK, "Tokens have been refreshed", {
-          user: loggedInUser,
-        })
+    try {
+      const deodedRefreshToken = jwt.verify(
+        incomingrefreshToken,
+        process.env.REFRESH_TOKEN_SECRET as string
       );
-  } catch (error) {
-    throw new ApiError(StatusCodes.UNAUTHORIZED, "Invalid refresh token");
+      const user = await User.findById((deodedRefreshToken as any).userId);
+      if (!user) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
+      }
+      if (user.refreshToken !== incomingrefreshToken) {
+        throw new ApiError(StatusCodes.UNAUTHORIZED, "Refresh Token Expired");
+      }
+      const accessToken = user.generateAccessToken();
+      const refreshToken = user.generateRefreshToken();
+      user.refreshToken = refreshToken;
+      await user.save({ validateBeforeSave: false });
+      const loggedInUser = await User.findById(user._id).select(
+        "-password -refreshToken"
+      );
+      return res
+        .status(StatusCodes.OK)
+        .cookie("accessToken", accessToken, accessTokenOptions)
+        .cookie("refreshToken", refreshToken, refreshTokenOptions)
+        .json(
+          new ApiResponse(StatusCodes.OK, "Tokens have been refreshed", {
+            user: loggedInUser,
+            accessToken,
+          })
+        );
+    } catch (error) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "Invalid refresh token");
+    }
   }
-});
+);
 
 export { registerUser, loginUser, refreshTokens };
