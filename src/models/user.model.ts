@@ -47,6 +47,24 @@ const userSchema = new Schema<IUser>(
     refreshToken: {
       type: String,
     },
+    friends: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
+    sentRequests: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "FriendRequest",
+      },
+    ],
+    receivedRequests: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "FriendRequest",
+      },
+    ],
   },
   {
     timestamps: true,
