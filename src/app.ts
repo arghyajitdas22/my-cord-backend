@@ -48,10 +48,12 @@ app.use(
 //import routes
 import healthcheckRoute from "./routes/healthcheck.route";
 import authRouter from "./routes/auth.route";
+import userRouter from "./routes/user.route";
 
 //use routes
 app.use("/api/v1/healthcheck", healthcheckRoute);
 app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/users", userRouter);
 
 app.use(errorHandler);
 

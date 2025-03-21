@@ -15,3 +15,14 @@ export type IUser = {
   generateAccessToken(): string;
   generateRefreshToken(): string;
 };
+
+export type TSearchUsersQuery = {
+  users: {
+    _id: Types.ObjectId;
+    username: string;
+    displayName: string;
+  }[];
+  totalUsers: number;
+  totalPages: number;
+  currentPage: number;
+};
