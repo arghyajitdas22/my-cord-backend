@@ -7,6 +7,7 @@ import { TSearchUsersQuery } from "../types/User";
 import { AuthenticatedRequest } from "../types/AuthenticatedRequest";
 import { ApiError } from "../utils/ApiError";
 import FriendRequest from "../models/request.model";
+import { FriendRequestStatus } from "../types/friendRequest.type";
 
 export const searchUsers = asyncHandler(async (req: Request, res: Response) => {
   const search = req.query.search?.toString().trim() || "";
@@ -102,5 +103,80 @@ export const sendFriendRequest = asyncHandler(
           friendRequest
         )
       );
+  }
+);
+
+export const updateFriendRequestStatus = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    const requestId = req.params.requestId;
+    const status = req.body.status;
+
+    if (!requestId || !status) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid request");
+    }
+
+    const request = await FriendRequest.findById(requestId);
+
+    if (!request) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Request not found");
+    }
+
+    if (request.receiver.toString() !== req.user?._id.toString()) {
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        "You are not authorized to update this request"
+      );
+    }
+
+    const sender = await User.findById(request.sender);
+    const receiver = await User.findById(request.receiver);
+
+    if (!sender || !receiver) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
+    }
+
+    sender.sentRequests = sender.sentRequests.filter(
+      (reqId) => reqId.toString() !== requestId
+    );
+    receiver.receivedRequests = receiver.receivedRequests.filter(
+      (reqId) => reqId.toString() !== requestId
+    );
+
+    if (status === FriendRequestStatus.ACCEPTED) {
+      sender.friends.push(receiver._id);
+      receiver.friends.push(sender._id);
+    }
+    await sender.save({ validateBeforeSave: false });
+    await receiver.save({ validateBeforeSave: false });
+
+    await FriendRequest.findByIdAndDelete(requestId);
+
+    res
+      .status(StatusCodes.OK)
+      .json(new ApiResponse(StatusCodes.OK, "Request updated", {}));
+  }
+);
+
+export const getAllFriends = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user?._id;
+
+    if (!userId) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid request");
+    }
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
+    }
+
+    const friends = await User.find({
+      _id: { $in: user.friends },
+    }).select("_id username displayName");
+
+    res
+      .status(StatusCodes.OK)
+      .json(new ApiResponse(StatusCodes.OK, "Friends found", friends));
   }
 );

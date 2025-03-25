@@ -5,3 +5,9 @@ export type TFriendRequest = {
   receiver: Types.ObjectId;
   status: string;
 };
+
+export enum FriendRequestStatus {
+  PENDING = "pending",
+  ACCEPTED = "accepted",
+  REJECTED = "rejected",
+}
