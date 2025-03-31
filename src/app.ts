@@ -4,10 +4,22 @@ import cookieParser from "cookie-parser";
 import { errorHandler } from "./middlewares/error.middleware";
 import logger from "./utils/logger";
 import morgan from "morgan";
+import { createServer } from "http";
+import { Server } from "socket.io";
 
 const morganFormat = ":method :url :status :response-time ms";
 
 const app = express();
+const httpServer = createServer(app);
+
+const io = new Server(httpServer, {
+  pingTimeout: 60000,
+  cors: {
+    origin: "http://localhost:5173",
+    credentials: true,
+  },
+});
+app.set("io", io);
 
 //common middlewares
 app.use(
@@ -57,4 +69,4 @@ app.use("/api/v1/users", userRouter);
 
 app.use(errorHandler);
 
-export { app };
+export { app, httpServer };
