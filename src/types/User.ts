@@ -10,6 +10,7 @@ export type IUser = {
   friends: Types.ObjectId[];
   sentRequests: Types.ObjectId[];
   receivedRequests: Types.ObjectId[];
+  servers: Types.ObjectId[];
 
   comparePassword(candidatePassword: string): Promise<boolean>;
   generateAccessToken(): string;

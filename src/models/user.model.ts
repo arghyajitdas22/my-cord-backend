@@ -65,6 +65,12 @@ const userSchema = new Schema<IUser>(
         ref: "FriendRequest",
       },
     ],
+    servers: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: "Server",
+      },
+    ],
   },
   {
     timestamps: true,
