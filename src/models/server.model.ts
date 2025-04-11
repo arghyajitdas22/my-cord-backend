@@ -15,14 +15,8 @@ const serverSchema = new Schema<IServerSchema>(
       trim: true,
     },
     avatar: {
-      url: {
-        type: String,
-        required: true,
-      },
-      localPath: {
-        type: String,
-        default: null,
-      },
+      type: String,
+      required: true,
     },
     members: [
       {
@@ -37,6 +31,17 @@ const serverSchema = new Schema<IServerSchema>(
   },
   { timestamps: true }
 );
+
+serverSchema.pre("save", async function (next) {
+  const server = this as IServerSchema;
+  const ownerIsAlreadyInMembers = server.members.some(
+    (member) => member.user.toString() === server.owner.toString()
+  );
+  if (!ownerIsAlreadyInMembers) {
+    server.members.push({ user: server.owner, role: "owner" });
+  }
+  next();
+});
 
 const Server: Model<IServerSchema> = model<IServerSchema>(
   "Server",

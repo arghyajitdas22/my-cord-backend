@@ -6,6 +6,8 @@ import logger from "./utils/logger";
 import morgan from "morgan";
 import { createServer } from "http";
 import { Server } from "socket.io";
+import dotenv from "dotenv";
+dotenv.config();
 
 const morganFormat = ":method :url :status :response-time ms";
 
@@ -61,11 +63,13 @@ app.use(
 import healthcheckRoute from "./routes/healthcheck.route";
 import authRouter from "./routes/auth.route";
 import userRouter from "./routes/user.route";
+import serverRouter from "./routes/server.route";
 
 //use routes
 app.use("/api/v1/healthcheck", healthcheckRoute);
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", userRouter);
+app.use("/api/v1/server", serverRouter);
 
 app.use(errorHandler);
 
