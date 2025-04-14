@@ -175,7 +175,7 @@ export const changeMemberRole = asyncHandler(
   }
 );
 
-export const removeMemeberFromServer = asyncHandler(
+export const removeMemberFromServer = asyncHandler(
   async (req: AuthenticatedRequest, res: Response) => {
     const { serverId } = req.params;
     const { memberId } = req.body;
@@ -236,5 +236,25 @@ export const removeMemeberFromServer = asyncHandler(
       .json(
         new ApiResponse(StatusCodes.OK, "Member removed from server", server)
       );
+  }
+);
+
+export const getAllServers = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user?._id;
+    if (!userId) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not found");
+    }
+
+    const servers = await Server.find({ "members.user": userId })
+      .populate("members.user", "-password -refreshToken")
+      .populate("owner", "-password -refreshToken")
+      .sort({ createdAt: -1 });
+
+    res.status(StatusCodes.OK).json(
+      new ApiResponse(StatusCodes.OK, "Servers fetched successfully", {
+        servers,
+      })
+    );
   }
 );

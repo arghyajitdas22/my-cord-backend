@@ -20,7 +20,12 @@ const serverSchema = new Schema<IServerSchema>(
     },
     members: [
       {
-        user: { type: Schema.Types.ObjectId, ref: "User", required: true },
+        user: {
+          type: Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+          index: true,
+        },
         role: {
           type: String,
           enum: ["owner", "admin", "member"],

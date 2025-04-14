@@ -3,7 +3,8 @@ import {
   addMembersToServer,
   changeMemberRole,
   createServer,
-  removeMemeberFromServer,
+  getAllServers,
+  removeMemberFromServer,
 } from "../controllers/server.controller";
 import { verifyAccessToken } from "../middlewares/auth.middleware";
 import router from "./healthcheck.route";
@@ -12,6 +13,8 @@ import { upload } from "../middlewares/multer.middleware";
 router
   .route("/")
   .post(verifyAccessToken, upload.single("avatar"), createServer);
+
+router.route("/get-all-servers").get(verifyAccessToken, getAllServers);
 
 router
   .route("/add-members/:serverId")
@@ -23,6 +26,6 @@ router
 
 router
   .route("/remove-member/:serverId")
-  .patch(verifyAccessToken, removeMemeberFromServer);
+  .patch(verifyAccessToken, removeMemberFromServer);
 
 export default router;
