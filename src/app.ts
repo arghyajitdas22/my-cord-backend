@@ -7,7 +7,9 @@ import morgan from "morgan";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import dotenv from "dotenv";
-dotenv.config();
+dotenv.config({
+  path: "./.env",
+});
 
 const morganFormat = ":method :url :status :response-time ms";
 
@@ -58,6 +60,8 @@ app.use(
     },
   })
 );
+
+//--TODO: apply rate limiter
 
 //import routes
 import healthcheckRoute from "./routes/healthcheck.route";
