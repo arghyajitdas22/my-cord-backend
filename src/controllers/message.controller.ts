@@ -22,9 +22,8 @@ const chatMessageCommonAggregation = () => {
         pipeline: [
           {
             $project: {
-              _id: 1,
-              username: 1,
-              // profilePicture: 1
+              password: 0,
+              refreshToken: 0,
             },
           },
         ],

@@ -69,6 +69,7 @@ import authRouter from "./routes/auth.route";
 import userRouter from "./routes/user.route";
 import serverRouter from "./routes/server.route";
 import messageRouter from "./routes/message.route";
+import chatRouter from "./routes/chat.route";
 import { initializeSocketIO } from "./socket";
 
 //use routes
@@ -77,6 +78,7 @@ app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/users", userRouter);
 app.use("/api/v1/server", serverRouter);
 app.use("/api/v1/message", messageRouter);
+app.use("/api/v1/chat", chatRouter);
 
 initializeSocketIO(io);
 

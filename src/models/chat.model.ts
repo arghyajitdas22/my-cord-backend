@@ -1,5 +1,6 @@
 import { Schema, Model, model } from "mongoose";
 import { IChatSchema } from "../validators/chat.validator";
+import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 
 const chatSchema = new Schema<IChatSchema>(
   {
@@ -36,6 +37,8 @@ const chatSchema = new Schema<IChatSchema>(
   },
   { timestamps: true }
 );
+
+chatSchema.plugin(mongooseAggregatePaginate);
 
 const Chat: Model<IChatSchema> = model<IChatSchema>("Chat", chatSchema);
 export default Chat;
