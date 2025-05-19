@@ -1,5 +1,6 @@
 import { Schema, model, Model } from "mongoose";
 import { IMessageSchema } from "../validators/message.validator";
+import mongooseAggregatePaginate from "mongoose-aggregate-paginate-v2";
 
 const messageSchema = new Schema<IMessageSchema>(
   {
@@ -19,23 +20,14 @@ const messageSchema = new Schema<IMessageSchema>(
       type: String,
       required: true,
     },
-    attachments: [
-      {
-        url: {
-          type: String,
-          required: true,
+    attachments: {
+      type: [
+        {
+          url: String,
         },
-        localPath: {
-          type: String,
-          default: null,
-        },
-        type: {
-          type: String,
-          enum: ["image", "video", "file"],
-          default: null,
-        },
-      },
-    ],
+      ],
+      default: [],
+    },
     isEdited: {
       type: Boolean,
       default: false,
@@ -47,6 +39,8 @@ const messageSchema = new Schema<IMessageSchema>(
   },
   { timestamps: true }
 );
+
+messageSchema.plugin(mongooseAggregatePaginate);
 
 const Message: Model<IMessageSchema> = model<IMessageSchema>(
   "Message",
