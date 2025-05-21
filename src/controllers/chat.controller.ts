@@ -332,3 +332,486 @@ export const getAllGroupChatsInAServer = asyncHandler(
       .json(new ApiResponse(StatusCodes.OK, "All Chats retrived", allChats));
   }
 );
+
+//getGroupChatDetails
+export const getGroupChatDetails = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { serverId, chatId } = req.params;
+    //check if such a chat exists
+    const requestedChat = await Chat.aggregate([
+      {
+        $match: {
+          _id: new mongoose.Types.ObjectId(chatId),
+          server: new mongoose.Types.ObjectId(serverId),
+          isGroupChat: true,
+        },
+      },
+      ...chatCommonAggregation(),
+    ]);
+    //return error or respesonse
+    if (!requestedChat.length) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "No such chat found");
+    }
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          "Chat details retrived",
+          requestedChat[0]
+        )
+      );
+  }
+);
+
+//renameGroupChat
+export const renameGroupChat = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { serverId, chatId } = req.params;
+    const { newGroupName } = req.body;
+
+    if (!newGroupName || newGroupName.trim().length === 0) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid group name");
+    }
+
+    //find server and check if req.user is a owner or admin in the server
+    const server = await Server.findById(new mongoose.Types.ObjectId(serverId));
+    if (!server) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid server id");
+    }
+    const filteredMembers = server.members.filter(
+      (member) => member.user.toString() === req.user?._id.toString()
+    );
+    if (filteredMembers.length === 0) {
+      throw new ApiError(
+        StatusCodes.UNAUTHORIZED,
+        "USer is not a member of the server"
+      );
+    }
+    if (
+      filteredMembers[0].role !== "owner" &&
+      filteredMembers[0].role !== "admin"
+    ) {
+      throw new ApiError(
+        StatusCodes.UNAUTHORIZED,
+        "User is not authorized make updates in group name"
+      );
+    }
+
+    //find chat by id and update
+    const updatedChat = await Chat.findOneAndUpdate(
+      {
+        _id: new mongoose.Types.ObjectId(chatId),
+        server: new mongoose.Types.ObjectId(serverId),
+        isGroupChat: true,
+      },
+      {
+        name: newGroupName,
+      },
+      {
+        new: true,
+      }
+    );
+
+    if (!updatedChat) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid chat id");
+    }
+
+    //emit socket
+    updatedChat.participants.forEach((participanyObjectId) => {
+      if (participanyObjectId.toString() === req.user?._id.toString()) return;
+
+      emitSocketEvent(
+        req,
+        participanyObjectId.toString(),
+        ChatEventEnum.UPDATE_GROUP_NAME_EVENT,
+        updatedChat
+      );
+    });
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(StatusCodes.OK, "Group Chat Name Changed", updatedChat)
+      );
+  }
+);
+
+//deleteGroupChat
+export const deleteGroupChat = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { serverId, chatId } = req.params;
+
+    //find server and check if req.user is a owner or admin in the server
+    const server = await Server.findById(new mongoose.Types.ObjectId(serverId));
+    if (!server) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid server id");
+    }
+    const filteredMembers = server.members.filter(
+      (member) => member.user.toString() === req.user?._id.toString()
+    );
+    if (filteredMembers.length === 0) {
+      throw new ApiError(
+        StatusCodes.UNAUTHORIZED,
+        "USer is not a member of the server"
+      );
+    }
+    if (
+      filteredMembers[0].role !== "owner" &&
+      filteredMembers[0].role !== "admin"
+    ) {
+      throw new ApiError(
+        StatusCodes.UNAUTHORIZED,
+        "User is not authorized to delete a group"
+      );
+    }
+
+    //find chat and delete
+    const chat = await Chat.findOneAndDelete({
+      _id: new mongoose.Types.ObjectId(chatId),
+      server: new mongoose.Types.ObjectId(serverId),
+      isGroupChat: true,
+    });
+
+    if (!chat) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "No such chat found");
+    }
+
+    chat.participants.forEach((participantObjectId) => {
+      if (participantObjectId.toString() === req.user?._id.toString()) return;
+
+      emitSocketEvent(
+        req,
+        participantObjectId.toString(),
+        ChatEventEnum.LEAVE_CHAT_EVENT,
+        chat
+      );
+    });
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(StatusCodes.OK, "Group chat deleted successfully", chat)
+      );
+  }
+);
+
+//leaveGroupChat
+export const leaveGroupChat = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { serverId, chatId } = req.params;
+
+    //find chat and see if user is participant
+    const chat = await Chat.findOne({
+      _id: new mongoose.Types.ObjectId(chatId),
+      server: new mongoose.Types.ObjectId(serverId),
+      isGroupChat: true,
+    });
+
+    if (!chat) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid server or chat id");
+    }
+
+    if (
+      req.user &&
+      !chat.participants.some((participant) =>
+        participant.equals(req.user?._id)
+      )
+    ) {
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        "You are not a part of the chat group"
+      );
+    }
+
+    //filter out the other participants
+    const updatedParticipants = chat.participants.filter(
+      (participantObjectId) =>
+        participantObjectId.toString() !== req.user?._id.toString()
+    );
+
+    chat.participants = updatedParticipants;
+    await chat.save();
+
+    const updatedChat = await Chat.aggregate([
+      {
+        $match: {
+          _id: chat._id,
+        },
+      },
+      ...chatCommonAggregation(),
+    ]);
+
+    if (!updatedChat.length) {
+      throw new ApiError(
+        StatusCodes.INTERNAL_SERVER_ERROR,
+        "Internal Srever Error"
+      );
+    }
+
+    chat.participants.forEach((participantObjectId) => {
+      if (participantObjectId.toString() === req.user?._id.toString()) return;
+
+      emitSocketEvent(
+        req,
+        participantObjectId.toString(),
+        ChatEventEnum.LEAVE_CHAT_EVENT,
+        updatedChat[0]
+      );
+    });
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(StatusCodes.OK, "You have left the chat", updatedChat)
+      );
+  }
+);
+
+//removeParticipantFromGroupChat
+export const removeParticipantFromGroupChat = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { serverId, chatId } = req.params;
+    const { participantId } = req.body;
+
+    //get server and chat and perform checks
+    const server = await Server.findById(new mongoose.Types.ObjectId(serverId));
+    if (!server) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid server id");
+    }
+
+    let filteredMebers = server.members.filter(
+      (member) => member.user.toString() === req.user?._id.toString()
+    );
+    if (!filteredMebers.length) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "User isnt in the server");
+    }
+
+    const chat = await Chat.findOne({
+      _id: new mongoose.Types.ObjectId(chatId),
+      server: server._id,
+      isGroupChat: true,
+    });
+    if (!chat) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid chat id");
+    }
+
+    //check if user is participant and owner or admin in server
+    let isOwnerOrAdmin =
+      filteredMebers[0].role === "owner" || filteredMebers[0].role === "admin";
+    let isParticipant = chat.participants.some((participant) =>
+      participant.equals(req.user?._id)
+    );
+    if (!isOwnerOrAdmin || !isParticipant) {
+      throw new ApiError(
+        StatusCodes.UNAUTHORIZED,
+        "You cannot remove a participant"
+      );
+    }
+
+    //check that the participant isnt a owner or admin and is also part of the group
+    filteredMebers = server.members.filter(
+      (member) => member.user.toString() === participantId
+    );
+    if (!filteredMebers.length) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Participant isnt in the server"
+      );
+    }
+
+    isOwnerOrAdmin =
+      filteredMebers[0].role === "owner" || filteredMebers[0].role === "admin";
+    if (isOwnerOrAdmin) {
+      throw new ApiError(
+        StatusCodes.FORBIDDEN,
+        "Cannot remove the owner or admin of a server"
+      );
+    }
+
+    isParticipant = chat.participants.some(
+      (participant) => participant.toString() === participantId
+    );
+    if (!isParticipant) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Participant isnt part of the group"
+      );
+    }
+
+    //filter out all the other participants and update chat.participants
+    const updatedParticipants = chat.participants.filter(
+      (participant) => participant.toString() !== participantId
+    );
+    chat.participants = updatedParticipants;
+    await chat.save();
+
+    //form updated chat aggregation
+    const updatedChat = await Chat.aggregate([
+      {
+        $match: {
+          _id: chat._id,
+        },
+      },
+      ...chatCommonAggregation(),
+    ]);
+
+    if (!updatedChat.length) {
+      throw new ApiError(
+        StatusCodes.INTERNAL_SERVER_ERROR,
+        "Internal Srever Error"
+      );
+    }
+
+    //emit socket event
+    chat.participants.forEach((participantObjectId) => {
+      if (participantObjectId.toString() === req.user?._id.toString()) return;
+
+      emitSocketEvent(
+        req,
+        participantObjectId.toString(),
+        ChatEventEnum.LEAVE_CHAT_EVENT,
+        updatedChat[0]
+      );
+    });
+
+    emitSocketEvent(
+      req,
+      participantId,
+      ChatEventEnum.LEAVE_CHAT_EVENT,
+      updatedChat
+    );
+
+    //return api response
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          "Participant has been removed",
+          updatedChat
+        )
+      );
+  }
+);
+
+//addParticipantsToGroupChat
+export const addParticipantToGroupChat = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    const { serverId, chatId } = req.params;
+    const { newParticipantId } = req.body;
+
+    //get server and chat and perform checks
+    const server = await Server.findById(new mongoose.Types.ObjectId(serverId));
+    if (!server) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid server id");
+    }
+
+    let filteredMebers = server.members.filter(
+      (member) => member.user.toString() === req.user?._id.toString()
+    );
+    if (!filteredMebers.length) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "User isnt in the server");
+    }
+
+    const chat = await Chat.findOne({
+      _id: new mongoose.Types.ObjectId(chatId),
+      server: server._id,
+      isGroupChat: true,
+    });
+    if (!chat) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid chat id");
+    }
+
+    //check if user is participant and owner or admin in server
+    let isOwnerOrAdmin =
+      filteredMebers[0].role === "owner" || filteredMebers[0].role === "admin";
+    let isParticipant = chat.participants.some((participant) =>
+      participant.equals(req.user?._id)
+    );
+    if (!isOwnerOrAdmin || !isParticipant) {
+      throw new ApiError(
+        StatusCodes.UNAUTHORIZED,
+        "You cannot add a participant in this group"
+      );
+    }
+
+    //check if the newParticipantId is in server
+    filteredMebers = server.members.filter(
+      (member) => member.user.toString() === newParticipantId
+    );
+    if (!filteredMebers.length) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "New Participant isnt in the server"
+      );
+    }
+
+    //check if already in chat
+    if (
+      chat.participants.some(
+        (participant) => participant.toString() === newParticipantId
+      )
+    ) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Participant is already a part of the chat"
+      );
+    }
+
+    //update the participant list with the new participant id
+    chat.participants = [
+      ...chat.participants,
+      new mongoose.Types.ObjectId(newParticipantId as string),
+    ];
+    await chat.save();
+
+    //aggregate the chat
+    const updatedChat = await Chat.aggregate([
+      {
+        $match: {
+          _id: chat._id,
+        },
+      },
+      ...chatCommonAggregation(),
+    ]);
+
+    if (!updatedChat.length) {
+      throw new ApiError(
+        StatusCodes.INTERNAL_SERVER_ERROR,
+        "Internal Srever Error"
+      );
+    }
+
+    //emit socket event
+    chat.participants.forEach((participantObjectId) => {
+      if (participantObjectId.toString() === req.user?._id.toString()) return;
+
+      emitSocketEvent(
+        req,
+        participantObjectId.toString(),
+        ChatEventEnum.JOIN_CHAT_EVENT,
+        updatedChat[0]
+      );
+    });
+
+    emitSocketEvent(
+      req,
+      newParticipantId,
+      ChatEventEnum.JOIN_CHAT_EVENT,
+      updatedChat[0]
+    );
+
+    //return api response
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          "Participant has been added",
+          updatedChat
+        )
+      );
+  }
+);

@@ -48,7 +48,12 @@ export const getAllMessages = asyncHandler(
       throw new ApiError(StatusCodes.NOT_FOUND, "Chat not found");
     }
 
-    if (req.user && !selectedChat.participants.includes(req.user?._id)) {
+    if (
+      req.user &&
+      !selectedChat.participants.some((participant) =>
+        participant.equals(req.user?._id)
+      )
+    ) {
       throw new ApiError(
         StatusCodes.FORBIDDEN,
         "You are not a participant of this chat"
@@ -100,7 +105,12 @@ export const sendMessage = asyncHandler(
       throw new ApiError(StatusCodes.NOT_FOUND, "Chat not found");
     }
 
-    if (req.user && !selectedChat.participants.includes(req.user?._id)) {
+    if (
+      req.user &&
+      !selectedChat.participants.some((participant) =>
+        participant.equals(req.user?._id)
+      )
+    ) {
       throw new ApiError(
         StatusCodes.FORBIDDEN,
         "You are not a participant of this chat"
