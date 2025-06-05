@@ -8,6 +8,8 @@ import { AuthenticatedRequest } from "../types/AuthenticatedRequest";
 import { ApiError } from "../utils/ApiError";
 import FriendRequest from "../models/request.model";
 import { FriendRequestStatus } from "../types/friendRequest.type";
+import { emitSocketEvent } from "../socket";
+import { ChatEventEnum } from "../constants";
 
 export const searchUsers = asyncHandler(async (req: Request, res: Response) => {
   const search = req.query.search?.toString().trim() || "";
@@ -93,6 +95,16 @@ export const sendFriendRequest = asyncHandler(
     await friendRequest.save();
     await sender.save({ validateBeforeSave: false });
     await receiver.save({ validateBeforeSave: false });
+
+    emitSocketEvent(
+      req,
+      receiver._id.toString(),
+      ChatEventEnum.FRIEND_REQUEST_SENT_EVENT,
+      {
+        friendRequest,
+        sender,
+      }
+    );
 
     return res
       .status(StatusCodes.CREATED)

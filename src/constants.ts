@@ -21,6 +21,12 @@ export const ChatEventEnum = Object.freeze({
   TYPING_EVENT: "typing",
   // ? when message is deleted
   MESSAGE_DELETE_EVENT: "messageDeleted",
+  // ? when user sends friend request
+  FRIEND_REQUEST_SENT_EVENT: "frindRequestSent",
+  // ? when user accepts friend request
+  FRIEND_REQUEST_ACCEPTED_EVENT: "frindRequestAccepted",
+  // ? when user sends rejected request
+  FRIEND_REQUEST_REJECTED_EVENT: "frindRequestRejected",
 });
 
 export const AvailableChatEvents = Object.values(ChatEventEnum);
