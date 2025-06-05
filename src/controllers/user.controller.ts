@@ -25,7 +25,7 @@ export const searchUsers = asyncHandler(async (req: Request, res: Response) => {
     };
   }
   const users = await User.find(query)
-    .select("_id username displayName")
+    .select("_id email username displayName")
     .skip(skip)
     .limit(limit);
   const totalUsers = await User.countDocuments(query);
