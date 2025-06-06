@@ -58,16 +58,18 @@ export const sendFriendRequest = asyncHandler(
       );
     }
 
-    const sender = await User.findById(senderId);
-    const receiver = await User.findById(receiverId);
+    const [sender, receiver] = await Promise.all([
+      User.findById(senderId),
+      User.findById(receiverId),
+    ]);
 
     if (!sender || !receiver) {
       throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
 
     if (
-      sender.friends.includes(receiverId as any) ||
-      receiver.friends.includes(senderId as any)
+      sender.friends.some((id) => id.toString() === receiverId.toString()) ||
+      receiver.friends.some((id) => id.toString() === senderId.toString())
     ) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "You are already friends");
     }
@@ -84,26 +86,71 @@ export const sendFriendRequest = asyncHandler(
       );
     }
 
-    const friendRequest = new FriendRequest({
-      sender: senderId,
-      receiver: receiverId,
+    const reverseRequest = await FriendRequest.findOne({
+      sender: receiverId,
+      receiver: senderId,
+    });
+    if (reverseRequest) {
+      throw new ApiError(
+        StatusCodes.BAD_REQUEST,
+        "Receiver has already sent you a friend request"
+      );
+    }
+
+    const friendRequest = await FriendRequest.create({
+      sender: sender._id,
+      receiver: receiver._id,
     });
 
-    sender.sentRequests.push(friendRequest._id);
-    receiver.receivedRequests.push(friendRequest._id);
+    await Promise.all([
+      User.updateOne(
+        { _id: senderId },
+        { $push: { sentRequests: friendRequest._id } },
+        { runValidators: false }
+      ),
+      User.updateOne(
+        { _id: receiverId },
+        { $push: { receivedRequests: friendRequest._id } },
+        { runValidators: false }
+      ),
+    ]);
 
-    await friendRequest.save();
-    await sender.save({ validateBeforeSave: false });
-    await receiver.save({ validateBeforeSave: false });
+    const populatedFriendRequest = await FriendRequest.aggregate([
+      {
+        $match: {
+          _id: friendRequest._id,
+        },
+      },
+      {
+        $lookup: {
+          from: "users",
+          foreignField: "_id",
+          localField: "sender",
+          as: "sender",
+          pipeline: [
+            {
+              $project: {
+                password: 0,
+                refreshToken: 0,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $addFields: {
+          sender: {
+            $first: "$sender",
+          },
+        },
+      },
+    ]);
 
     emitSocketEvent(
       req,
       receiver._id.toString(),
       ChatEventEnum.FRIEND_REQUEST_SENT_EVENT,
-      {
-        friendRequest,
-        sender,
-      }
+      populatedFriendRequest[0]
     );
 
     return res
@@ -112,7 +159,7 @@ export const sendFriendRequest = asyncHandler(
         new ApiResponse(
           StatusCodes.CREATED,
           "Friend request sent",
-          friendRequest
+          populatedFriendRequest[0]
         )
       );
   }
