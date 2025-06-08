@@ -1,6 +1,7 @@
 import { Router } from "express";
 import {
   getAllFriends,
+  getAllInvitations,
   searchUsers,
   sendFriendRequest,
   updateFriendRequestStatus,
@@ -17,5 +18,6 @@ router
   .route("/change-friend-request-status/:requestId")
   .patch(verifyAccessToken, updateFriendRequestStatus);
 router.route("/getAllFriends").get(verifyAccessToken, getAllFriends);
+router.route("/getAllInvitations").get(verifyAccessToken, getAllInvitations);
 
 export default router;
