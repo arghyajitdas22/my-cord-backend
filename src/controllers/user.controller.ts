@@ -10,6 +10,7 @@ import FriendRequest from "../models/request.model";
 import { FriendRequestStatus } from "../types/friendRequest.type";
 import { emitSocketEvent } from "../socket";
 import { ChatEventEnum } from "../constants";
+import mongoose from "mongoose";
 
 export const searchUsers = asyncHandler(async (req: Request, res: Response) => {
   const search = req.query.search?.toString().trim() || "";
@@ -237,5 +238,52 @@ export const getAllFriends = asyncHandler(
     res
       .status(StatusCodes.OK)
       .json(new ApiResponse(StatusCodes.OK, "Friends found", friends));
+  }
+);
+
+export const getAllInvitations = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    const inviations = await FriendRequest.aggregate([
+      {
+        $match: {
+          receiver: new mongoose.Types.ObjectId(req.user?._id),
+          status: FriendRequestStatus.PENDING,
+        },
+      },
+      {
+        $lookup: {
+          from: "users",
+          foreignField: "_id",
+          localField: "sender",
+          as: "sender",
+          pipeline: [
+            {
+              $project: {
+                password: 0,
+                refreshToken: 0,
+              },
+            },
+          ],
+        },
+      },
+      {
+        $addFields: {
+          sender: {
+            $first: "$sender",
+          },
+        },
+      },
+      { $sort: { createdAt: -1 } },
+    ]);
+
+    return res
+      .status(StatusCodes.OK)
+      .json(
+        new ApiResponse(
+          StatusCodes.OK,
+          "All inviations are fetched",
+          inviations
+        )
+      );
   }
 );
