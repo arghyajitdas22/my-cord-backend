@@ -35,31 +35,28 @@ const initializeSocketIO = (io: Server) => {
   io.on("connection", async (socket: Socket) => {
     try {
       const cookies = cookie.parse(socket.handshake.headers?.cookie || "");
-      let token = cookies?.accessToken;
+      let accessToken = cookies?.accessToken;
 
-      if (!token) {
-        token = socket.handshake.auth?.token;
+      if (!accessToken) {
+        accessToken = socket.handshake.auth?.token;
       }
 
-      if (!token) {
+      if (!accessToken) {
         throw new ApiError(
           StatusCodes.UNAUTHORIZED,
           "Unauthorized hanshake - no token found"
         );
       }
 
-      const decodedToken = jwt.verify(
-        token,
+      const decodedAccessToken = jwt.verify(
+        accessToken,
         process.env.ACCESS_TOKEN_SECRET as string
-      ) as DecodedToken;
-      const user = await User.findById(decodedToken._id).select(
-        "-password -refreshToken"
       );
-
+      const user = await User.findById((decodedAccessToken as any).userId);
       if (!user) {
         throw new ApiError(
           StatusCodes.UNAUTHORIZED,
-          "Unauthorized hanshake - no user found"
+          "Invalid token - no user found"
         );
       }
 

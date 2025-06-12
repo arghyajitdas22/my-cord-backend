@@ -12,36 +12,39 @@ import { emitSocketEvent } from "../socket";
 import { ChatEventEnum } from "../constants";
 import mongoose from "mongoose";
 
-export const searchUsers = asyncHandler(async (req: Request, res: Response) => {
-  const search = req.query.search?.toString().trim() || "";
-  const page = parseInt(req.query.page?.toString() || "1");
-  const limit = parseInt(req.query.limit?.toString() || "5");
-  const skip = (page - 1) * limit;
+export const searchUsers = asyncHandler(
+  async (req: AuthenticatedRequest, res: Response) => {
+    const search = req.query.search?.toString().trim() || "";
+    const page = parseInt(req.query.page?.toString() || "1");
+    const limit = parseInt(req.query.limit?.toString() || "5");
+    const skip = (page - 1) * limit;
 
-  let query = {};
-  if (search.length > 0) {
-    query = {
-      username: {
+    const query: any = {
+      _id: { $ne: req.user?._id },
+    };
+
+    if (search.length > 0) {
+      query.username = {
         $regex: search,
         $options: "i",
-      },
-    };
-  }
-  const users = await User.find(query)
-    .select("_id email username displayName")
-    .skip(skip)
-    .limit(limit);
-  const totalUsers = await User.countDocuments(query);
+      };
+    }
+    const users = await User.find(query)
+      .select("_id email username displayName")
+      .skip(skip)
+      .limit(limit);
+    const totalUsers = await User.countDocuments(query);
 
-  res.status(StatusCodes.OK).json(
-    new ApiResponse<TSearchUsersQuery>(StatusCodes.OK, "Users found", {
-      users,
-      totalUsers,
-      totalPages: Math.ceil(totalUsers / limit),
-      currentPage: page,
-    })
-  );
-});
+    res.status(StatusCodes.OK).json(
+      new ApiResponse<TSearchUsersQuery>(StatusCodes.OK, "Users found", {
+        users,
+        totalUsers,
+        totalPages: Math.ceil(totalUsers / limit),
+        currentPage: page,
+      })
+    );
+  }
+);
 
 export const sendFriendRequest = asyncHandler(
   async (req: AuthenticatedRequest, res: Response) => {
