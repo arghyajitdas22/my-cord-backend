@@ -3,14 +3,15 @@ import { User } from "../models/user.model";
 import { asyncHandler } from "../utils/asyncHandler";
 import { StatusCodes } from "http-status-codes";
 import { ApiResponse } from "../utils/ApiResponse";
-import { TSearchUsersQuery } from "../types/User";
+import { IUser, TSearchUsersQuery } from "../types/User";
 import { AuthenticatedRequest } from "../types/AuthenticatedRequest";
 import { ApiError } from "../utils/ApiError";
 import FriendRequest from "../models/request.model";
 import { FriendRequestStatus } from "../types/friendRequest.type";
 import { emitSocketEvent } from "../socket";
 import { ChatEventEnum } from "../constants";
-import mongoose from "mongoose";
+import mongoose, { HydratedDocument } from "mongoose";
+import { createOrGetOneOnOneChat } from "../services/chat.service";
 
 export const searchUsers = asyncHandler(
   async (req: AuthenticatedRequest, res: Response) => {
@@ -174,49 +175,98 @@ export const updateFriendRequestStatus = asyncHandler(
     const requestId = req.params.requestId;
     const status = req.body.status;
 
+    // Validate input
     if (!requestId || !status) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid request");
     }
 
-    const request = await FriendRequest.findById(requestId);
-
-    if (!request) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Request not found");
+    if (!Object.values(FriendRequestStatus).includes(status)) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid request status");
     }
 
-    if (request.receiver.toString() !== req.user?._id.toString()) {
-      throw new ApiError(
-        StatusCodes.FORBIDDEN,
-        "You are not authorized to update this request"
+    const session = await mongoose.startSession();
+    try {
+      session.startTransaction();
+
+      // Fetch the friend request
+      const friendRequest =
+        await FriendRequest.findById(requestId).session(session);
+      if (!friendRequest) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "Request not found");
+      }
+
+      // Authorization check
+      if (friendRequest.receiver.toString() !== req.user?._id.toString()) {
+        throw new ApiError(
+          StatusCodes.FORBIDDEN,
+          "You are not authorized to update this request"
+        );
+      }
+
+      // Fetch sender and receiver
+      const sender = await User.findById(friendRequest.sender).session(session);
+      const receiver = await User.findById(friendRequest.receiver).session(
+        session
       );
+
+      if (!sender || !receiver) {
+        throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
+      }
+
+      // Remove the request from both users
+      sender.sentRequests = sender.sentRequests.filter(
+        (reqId) => reqId.toString() !== requestId
+      );
+      receiver.receivedRequests = receiver.receivedRequests.filter(
+        (reqId) => reqId.toString() !== requestId
+      );
+
+      let response: any = {};
+      // If accepted, add each other as friends (without duplication)
+      if (status === FriendRequestStatus.ACCEPTED) {
+        if (!sender.friends.includes(receiver._id)) {
+          sender.friends.push(receiver._id);
+        }
+
+        if (!receiver.friends.includes(sender._id)) {
+          receiver.friends.push(sender._id);
+        }
+
+        response = await createOrGetOneOnOneChat(sender._id, receiver._id);
+
+        // Emit socket event
+        response.participants.forEach(
+          (participant: HydratedDocument<IUser>) => {
+            if (participant._id.toString() !== req.user?._id.toString()) {
+              emitSocketEvent(
+                req,
+                participant._id.toString(),
+                ChatEventEnum.NEW_CHAT_EVENT,
+                response
+              );
+            }
+          }
+        );
+      }
+
+      // Save updates
+      await sender.save({ validateBeforeSave: false, session });
+      await receiver.save({ validateBeforeSave: false, session });
+
+      // Delete the request
+      await FriendRequest.findByIdAndDelete(requestId).session(session);
+
+      await session.commitTransaction();
+      session.endSession();
+
+      return res
+        .status(StatusCodes.OK)
+        .json(new ApiResponse(StatusCodes.OK, "Request updated", response));
+    } catch (err) {
+      await session.abortTransaction();
+      session.endSession();
+      throw err;
     }
-
-    const sender = await User.findById(request.sender);
-    const receiver = await User.findById(request.receiver);
-
-    if (!sender || !receiver) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
-    }
-
-    sender.sentRequests = sender.sentRequests.filter(
-      (reqId) => reqId.toString() !== requestId
-    );
-    receiver.receivedRequests = receiver.receivedRequests.filter(
-      (reqId) => reqId.toString() !== requestId
-    );
-
-    if (status === FriendRequestStatus.ACCEPTED) {
-      sender.friends.push(receiver._id);
-      receiver.friends.push(sender._id);
-    }
-    await sender.save({ validateBeforeSave: false });
-    await receiver.save({ validateBeforeSave: false });
-
-    await FriendRequest.findByIdAndDelete(requestId);
-
-    res
-      .status(StatusCodes.OK)
-      .json(new ApiResponse(StatusCodes.OK, "Request updated", {}));
   }
 );
 

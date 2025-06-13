@@ -10,9 +10,12 @@ import { ApiResponse } from "../utils/ApiResponse";
 import { emitSocketEvent } from "../socket";
 import { ChatEventEnum } from "../constants";
 import Server from "../models/server.model";
+import { createOrGetOneOnOneChat } from "../services/chat.service";
+import { IUser } from "../types/User";
+import { HydratedDocument } from "mongoose";
 
 //chatCommonAggregation
-const chatCommonAggregation = () => {
+export const chatCommonAggregation = () => {
   return [
     {
       //get participant details of the chat
@@ -83,63 +86,14 @@ export const createOrGetAOneOnOneChat = asyncHandler(
       throw new ApiError(StatusCodes.BAD_REQUEST, "Receiver Id not found");
     }
 
-    const receiver = await User.findById(
+    if (!req.user) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not logged in");
+    }
+
+    const newChat = await createOrGetOneOnOneChat(
+      req.user?._id,
       new mongoose.Types.ObjectId(receiverId)
     );
-    if (!receiver) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Receiver not found");
-    }
-
-    if (receiver._id.toString() === req.user?._id.toString()) {
-      throw new ApiError(
-        StatusCodes.FORBIDDEN,
-        "Receiver and sender cannot be same"
-      );
-    }
-
-    //check for already existing chat
-    const chat = await Chat.aggregate([
-      {
-        $match: {
-          isGroupChat: false,
-          $and: [
-            {
-              participants: { $elemMatch: { $eq: req.user?._id } },
-            },
-            {
-              participants: { $elemMatch: { $eq: receiver._id } },
-            },
-          ],
-        },
-      },
-      ...chatCommonAggregation(),
-    ]);
-
-    if (chat.length) {
-      return res
-        .status(StatusCodes.OK)
-        .json(
-          new ApiResponse(StatusCodes.OK, "Chat retrieved succesfully", chat[0])
-        );
-    }
-
-    //if not create new chat
-    const newChatInstance = await Chat.create({
-      name: "One On One Chat",
-      isGroupChat: false,
-      participants: [req.user?._id, receiver._id],
-    });
-
-    const createdChat = await Chat.aggregate([
-      {
-        $match: {
-          _id: newChatInstance._id,
-        },
-      },
-      ...chatCommonAggregation(),
-    ]);
-
-    const newChat = createdChat[0];
     if (!newChat) {
       throw new ApiError(
         StatusCodes.INTERNAL_SERVER_ERROR,
@@ -148,12 +102,12 @@ export const createOrGetAOneOnOneChat = asyncHandler(
     }
 
     //emit socket event
-    newChatInstance.participants.forEach((participantObjectId) => {
-      if (participantObjectId.toString() === req.user?._id.toString()) return;
+    newChat.participants.forEach((participant: HydratedDocument<IUser>) => {
+      if (participant._id.toString() === req.user?._id.toString()) return;
 
       emitSocketEvent(
         req,
-        participantObjectId.toString(),
+        participant._id.toString(),
         ChatEventEnum.NEW_CHAT_EVENT,
         newChat
       );
