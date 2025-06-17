@@ -185,6 +185,7 @@ export const updateFriendRequestStatus = asyncHandler(
     }
 
     const session = await mongoose.startSession();
+
     try {
       session.startTransaction();
 
@@ -234,6 +235,13 @@ export const updateFriendRequestStatus = asyncHandler(
 
         response = await createOrGetOneOnOneChat(sender._id, receiver._id);
 
+        if (!response) {
+          throw new ApiError(
+            StatusCodes.INTERNAL_SERVER_ERROR,
+            "Failed to create or get one-on-one chat"
+          );
+        }
+
         // Emit socket event
         response.participants.forEach(
           (participant: HydratedDocument<IUser>) => {
@@ -257,15 +265,15 @@ export const updateFriendRequestStatus = asyncHandler(
       await FriendRequest.findByIdAndDelete(requestId).session(session);
 
       await session.commitTransaction();
-      session.endSession();
 
       return res
         .status(StatusCodes.OK)
         .json(new ApiResponse(StatusCodes.OK, "Request updated", response));
     } catch (err) {
       await session.abortTransaction();
-      session.endSession();
       throw err;
+    } finally {
+      session.endSession();
     }
   }
 );

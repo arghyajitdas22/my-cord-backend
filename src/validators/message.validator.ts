@@ -6,8 +6,6 @@ export interface IMessageSchema extends Document {
   content: string;
   attachments: {
     url: string;
-    localPath?: string;
-    type?: "image" | "video" | "file";
   }[];
   isEdited: boolean;
   isDeleted: boolean;

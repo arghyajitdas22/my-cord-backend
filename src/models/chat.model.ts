@@ -29,11 +29,6 @@ const chatSchema = new Schema<IChatSchema>(
         required: true,
       },
     ],
-    unreadMessages: {
-      type: Map,
-      of: Number,
-      default: {},
-    },
   },
   { timestamps: true }
 );

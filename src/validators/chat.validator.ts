@@ -5,6 +5,5 @@ export interface IChatSchema extends Document {
   isGroupChat: boolean;
   lastMessage?: mongoose.Types.ObjectId;
   participants: mongoose.Types.ObjectId[];
-  unreadMessages?: Map<mongoose.Types.ObjectId, number>;
   server?: mongoose.Types.ObjectId;
 }
