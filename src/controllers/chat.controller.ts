@@ -248,6 +248,11 @@ export const getAllOneToOneChats = asyncHandler(
         },
       },
       ...chatCommonAggregation(),
+      {
+        $sort: {
+          createdAt: -1,
+        },
+      },
     ]);
 
     return res
