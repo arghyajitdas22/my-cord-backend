@@ -84,7 +84,7 @@ const loginUser = asyncHandler(async (req: Request, res: Response) => {
 const refreshTokens = asyncHandler(async (req: Request, res: Response) => {
   const incomingrefreshToken = req.cookies.refreshToken;
   if (!incomingrefreshToken) {
-    throw new ApiError(StatusCodes.BAD_REQUEST, "Refresh token is missing");
+    throw new ApiError(StatusCodes.BAD_REQUEST, "Session Expired!");
   }
 
   try {
@@ -97,7 +97,7 @@ const refreshTokens = asyncHandler(async (req: Request, res: Response) => {
       throw new ApiError(StatusCodes.NOT_FOUND, "User not found");
     }
     if (user.refreshToken !== incomingrefreshToken) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, "Refresh Token Expired");
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Session Expired");
     }
     const accessToken = user.generateAccessToken();
     const refreshToken = user.generateRefreshToken();
