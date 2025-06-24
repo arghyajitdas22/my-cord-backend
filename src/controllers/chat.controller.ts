@@ -250,6 +250,7 @@ export const getAllOneToOneChats = asyncHandler(
       ...chatCommonAggregation(),
       {
         $sort: {
+          "lastMessage.createdAt": -1,
           createdAt: -1,
         },
       },
@@ -284,6 +285,12 @@ export const getAllGroupChatsInAServer = asyncHandler(
         },
       },
       ...chatCommonAggregation(),
+      {
+        $sort: {
+          "lastMessage.createdAt": -1,
+          createdAt: -1,
+        },
+      },
     ]);
 
     return res
