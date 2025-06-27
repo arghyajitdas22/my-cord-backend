@@ -67,11 +67,6 @@ export const getAllMessages = asyncHandler(
         },
       },
       ...chatMessageCommonAggregation(),
-      {
-        $sort: {
-          createdAt: -1,
-        },
-      },
     ]);
 
     return res
@@ -129,7 +124,7 @@ export const sendMessage = asyncHandler(
       });
     }
 
-    const message = await Chat.create({
+    const message = await Message.create({
       sender: new mongoose.Types.ObjectId(req.user?._id),
       content: content || "",
       chat: new mongoose.Types.ObjectId(chatId),
@@ -155,7 +150,7 @@ export const sendMessage = asyncHandler(
     const messages = await Message.aggregate([
       {
         $match: {
-          _id: new mongoose.Types.ObjectId(message._id),
+          _id: message._id,
         },
       },
       ...chatMessageCommonAggregation(),
